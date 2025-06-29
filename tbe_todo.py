@@ -7,6 +7,7 @@ from typing import Dict, List
 
 from textual.app import App, ComposeResult
 from textual.containers import ScrollableContainer, Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Static, Input, Select, Button, Label
@@ -57,9 +58,8 @@ class MainTask(Task):
     subTasks: List[Task] = field(default_factory=list)
 
     def to_dict(self):
-        retval = super().to_dict()
         return {
-            **retval,
+            **super().to_dict(),
             "importance": self.importance.value,
             "subTasks": [item.to_dict() for item in self.subTasks]
         }
@@ -135,7 +135,8 @@ class TodoItem(Static, can_focus=True):
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
         ("-", "regress_task", "Prev State"),
-        ("+", "progress_task", "Next State")
+        ("+", "progress_task", "Next State"),
+        ("enter", "focus_subtasks", "Go to subtasks")
     ]
 
     local_task: reactive[MainTask] = reactive(None)
@@ -237,6 +238,7 @@ class TodoApp(App):
     CSS_PATH = 'tbe_todo.tcss'
     BINDINGS = [
         ("a", "add_task", "Add Task"),
+        ("escape", "focus_tasks", "Go to tasks"),
         ("q", "quit", "Quit")
     ]
 
@@ -268,7 +270,7 @@ class TodoApp(App):
                 yield Button("Add Task", variant="primary", id="add_task_button")
         yield Footer()
 
-    async def watch_subtasks(self, updated_subtasks: List[Task]) -> None:
+    async def watch_subtasks(self) -> None:
         """
 
         :param updated_subtasks:
