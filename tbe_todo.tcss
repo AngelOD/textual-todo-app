@@ -1,0 +1,49 @@
+TodoItem {
+    background: $secondary;
+
+    &:focus {
+        background: $primary;
+    }
+}
+
+#add_subtask_container {
+    height: 3;
+
+    &>#add_subtask_input {
+        width: 1fr;
+    }
+
+    &>#add_subtask_button {
+        width: 15;
+    }
+}
+
+#add_task_container {
+    height: 5;
+
+    &>#add_task_input {
+        width: 50%;
+    }
+}
+
+
+#subtasks_title {
+    content-align: center middle;
+    text-style: bold;
+    height: 3;
+    width: 100%;
+}
+
+#todo_items {
+    border: double $accent;
+    box-sizing: border-box;
+    padding: 1;
+    width: 66%;
+}
+
+#todo_subitems {
+    border: double $secondary;
+    box-sizing: border-box;
+    padding: 1;
+    width: 100%;
+}
