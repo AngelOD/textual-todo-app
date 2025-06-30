@@ -1,142 +1,26 @@
-import json
-import pathlib
 import uuid
-from dataclasses import dataclass, field
-from enum import StrEnum
-from typing import Dict, List
+
+from typing import List
 
 from textual.app import App, ComposeResult
 from textual.containers import ScrollableContainer, Horizontal, Vertical
-from textual.css.query import NoMatches
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Static, Input, Select, Button, Label
 
-TODO_FILE = "todo_list.json"
-
-
-class TaskImportance(StrEnum):
-    CRITICAL = "critical"
-    HIGH = "high"
-    MEDIUM = "medium"
-    LOW = "low"
-    NEGLIGIBLE = "negligible"
-
-
-class TaskState(StrEnum):
-    NEW = "new"
-    STARTED = "started"
-    FINALISING = "finalising"
-    COMPLETED = "completed"
-
-
-@dataclass
-class Task:
-    id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    title: str = ""
-    state: TaskState = TaskState.NEW
-
-    def to_dict(self):
-        return {
-            "id": self.id,
-            "title": self.title,
-            "state": self.state.value,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        return cls(
-            id=data["id"],
-            title=data["title"],
-            state=TaskState(data["state"]),
-        )
-
-
-@dataclass
-class MainTask(Task):
-    importance: TaskImportance = TaskImportance.MEDIUM
-    subTasks: List[Task] = field(default_factory=list)
-
-    def to_dict(self):
-        return {
-            **super().to_dict(),
-            "importance": self.importance.value,
-            "subTasks": [item.to_dict() for item in self.subTasks]
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict):
-        return cls(
-            id=data["id"],
-            title=data["title"],
-            state=TaskState(data["state"]),
-            importance=TaskImportance(data["importance"]),
-            subTasks=[Task.from_dict(t) for t in data["subTasks"]]
-        )
-
-
-def load_tasks() -> List[MainTask]:
-    """
-    Loads tasks from JSON file
-    :return:
-    """
-    path = pathlib.Path(TODO_FILE)
-
-    if not path.exists():
-        return []
-
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-            if not isinstance(data, list):
-                print(f"Warning: {TODO_FILE} is not a valid todo file. Starting with an empty list.")
-                return []
-            return [MainTask.from_dict(t) for t in data]
-    except (json.JSONDecodeError, FileNotFoundError, TypeError) as err:
-        print(f"Error: {err}. Starting with an empty list.")
-        return []
-
-
-def save_tasks(tasks: List[MainTask]) -> None:
-    """Saves tasks to JSON file"""
-    path = pathlib.Path(TODO_FILE)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump([t.to_dict() for t in tasks], f, indent=2)
-
-
-def sort_subtasks(tasks: List[Task]) -> List[Task]:
-    return [t for t in tasks if t.state != TaskState.COMPLETED] + \
-        [t for t in tasks if t.state == TaskState.COMPLETED]
-
-
-def sort_tasks(tasks: List[MainTask]) -> List[MainTask]:
-    desired_order = list(TaskImportance)
-    new_tasks = []
-
-    unfinished_tasks = [t for t in tasks if t.state != TaskState.COMPLETED]
-    finished_tasks = [t for t in tasks if t.state == TaskState.COMPLETED]
-
-    for importance in desired_order:
-        new_tasks += [t for t in unfinished_tasks if t.importance == importance]
-
-    return new_tasks + finished_tasks
-
-
-def uuid_to_id(uuid_to_convert: str) -> str:
-    return f"id_{uuid_to_convert}".replace("-", "_")
+from tbe_todo_types import AppActivity, MainTask, Task, TaskImportance, TaskState
+from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks, uuid_to_id
 
 
 class TodoItem(Static, can_focus=True):
-    """Displays a single ToDo item"""
+    """Displays a single Todo item"""
 
     BINDINGS = [
         ("s", "add_subtask", "Add Subtask"),
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
         ("-", "regress_task", "Prev State"),
-        ("+", "progress_task", "Next State"),
-        ("enter", "focus_subtasks", "Go to subtasks")
+        ("+", "progress_task", "Next State")
     ]
 
     local_task: reactive[MainTask] = reactive(None)
@@ -239,9 +123,11 @@ class TodoApp(App):
     BINDINGS = [
         ("a", "add_task", "Add Task"),
         ("escape", "focus_tasks", "Go to tasks"),
+        ("enter", "focus_subtasks", "Go to subtasks"),
         ("q", "quit", "Quit")
     ]
 
+    current_activity: reactive[AppActivity] = reactive(None)
     subtasks: reactive[List[Task]] = reactive([])
     selected_task_title: reactive[str] = reactive("")
     tasks: reactive[List[MainTask]] = reactive(sort_tasks(load_tasks()))
@@ -269,6 +155,20 @@ class TodoApp(App):
                                          value=TaskImportance.MEDIUM, allow_blank=False)
                 yield Button("Add Task", variant="primary", id="add_task_button")
         yield Footer()
+
+    def watch_current_activity(self, new_activity: AppActivity) -> None:
+        if new_activity is None:
+            return
+
+        tic = self.query_one("#todo_items", ScrollableContainer)
+        stic = self.query_one("#todo_subitems", ScrollableContainer)
+
+        if new_activity == AppActivity.FOCUS_TASKS:
+            stic.disabled = True
+            tic.disabled = False
+        elif new_activity == AppActivity.FOCUS_SUBTASKS:
+            tic.disabled = True
+            stic.disabled = False
 
     async def watch_subtasks(self) -> None:
         """
@@ -337,9 +237,13 @@ class TodoApp(App):
         add_container.disabled = False
         task_input.focus()
 
-    def action_quit(self) -> None:
-        """Handler for "quit" keypress"""
-        self.app.exit()
+    def action_focus_subtasks(self):
+        """ """
+        self.current_activity = AppActivity.FOCUS_SUBTASKS
+
+    def action_focus_tasks(self):
+        """ """
+        self.current_activity = AppActivity.FOCUS_TASKS
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "add_task_button":
@@ -354,6 +258,9 @@ class TodoApp(App):
             self.tasks = sort_tasks(self.tasks + [
                 MainTask(title=title_input.value.strip(), importance=TaskImportance(importance_select.selection))])
             add_container.disabled = True
+
+    def on_mount(self):
+        self.current_activity = AppActivity.FOCUS_TASKS
 
     def on_todo_item_add_subtask(self, message: TodoItem.AddSubtask) -> None:
         """

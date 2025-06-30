@@ -1,6 +1,4 @@
 TodoItem {
-    background: $secondary;
-
     &:focus {
         background: $primary;
     }
