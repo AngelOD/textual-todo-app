@@ -9,6 +9,30 @@ from tbe_todo_types import MainTask, Task, TaskImportance, TaskState
 TODO_FILE = "todo_list.json"
 
 
+def format_task_title(task: Task):
+    marker = "\\[ ]"
+    wrapper = "[italic]"
+    wrapper_end = "[/]"
+
+    match task.state:
+        case TaskState.STARTED:
+            marker = "\\[-]"
+            wrapper = ""
+            wrapper_end = ""
+        case TaskState.FINALISING:
+            marker = "\\[+]"
+            wrapper = "[underline]"
+            wrapper_end = "[/]"
+        case TaskState.COMPLETED:
+            marker = "\\[x]"
+            wrapper = "[strike][dim]"
+            wrapper_end = "[/][/]"
+
+    suffix = f" ({task.importance.value[0].upper()})" if isinstance(task, MainTask) else ""
+
+    return f"{marker} {wrapper}{task.title}{wrapper_end}{suffix}"
+
+
 def load_tasks() -> List[MainTask]:
     """
     Loads tasks from JSON file

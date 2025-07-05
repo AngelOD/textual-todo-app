@@ -4,12 +4,14 @@ from typing import List
 
 from textual.app import App, ComposeResult
 from textual.containers import ScrollableContainer, Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Static, Input, Select, Button, Label
 
 from tbe_todo_types import AppActivity, MainTask, Task, TaskImportance, TaskState
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks, uuid_to_id
+from components.TodoList import TodoList
 
 
 class TodoItem(Static, can_focus=True):
@@ -141,7 +143,9 @@ class TodoApp(App):
         yield Header()
         with Vertical():
             with Horizontal():
-                yield ScrollableContainer(name="todo_items", id="todo_items", can_focus=False, can_focus_children=True)
+                with Vertical():
+                    yield ScrollableContainer(name="todo_items", id="todo_items", can_focus=False, can_focus_children=True)
+                    yield TodoList(self.tasks, id="new_todo_items")
                 with Vertical():
                     yield Label("Test", id="subtasks_title")
                     yield ScrollableContainer(name="todo_subitems", id="todo_subitems", can_focus=False,
@@ -194,6 +198,11 @@ class TodoApp(App):
         :return:
         """
         await self.render_tasks()
+        try:
+            tl = self.query_one("#new_todo_items", TodoList)
+            tl.update_options(self.tasks)
+        except NoMatches:
+            pass
         save_tasks(updated_tasks)
 
     async def render_subtasks(self) -> None:

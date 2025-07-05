@@ -36,7 +36,12 @@ TodoItem {
     border: double $accent;
     box-sizing: border-box;
     padding: 1;
+    height: 50%;
     width: 66%;
+}
+
+#new_todo_items {
+    height: 50%;
 }
 
 #todo_subitems {
