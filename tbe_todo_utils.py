@@ -83,3 +83,6 @@ def sort_tasks(tasks: List[MainTask]) -> List[MainTask]:
 
 def uuid_to_id(uuid_to_convert: str) -> str:
     return f"id_{uuid_to_convert}".replace("-", "_")
+
+def id_to_uuid(id_to_convert: str) -> str:
+    return id_to_convert.replace("id_", "").replace("_", "-")

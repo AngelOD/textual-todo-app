@@ -11,7 +11,7 @@ from textual.widgets import Footer, Header, Static, Input, Select, Button, Label
 
 from tbe_todo_types import AppActivity, MainTask, Task, TaskImportance, TaskState
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks, uuid_to_id
-from components.TodoList import TodoList
+from components.NewTodoList import NewTodoList
 
 
 class TodoItem(Static, can_focus=True):
@@ -143,9 +143,7 @@ class TodoApp(App):
         yield Header()
         with Vertical():
             with Horizontal():
-                with Vertical():
-                    yield ScrollableContainer(name="todo_items", id="todo_items", can_focus=False, can_focus_children=True)
-                    yield TodoList(self.tasks, id="new_todo_items")
+                yield NewTodoList(self.tasks, id="todo_items")
                 with Vertical():
                     yield Label("Test", id="subtasks_title")
                     yield ScrollableContainer(name="todo_subitems", id="todo_subitems", can_focus=False,
@@ -159,20 +157,6 @@ class TodoApp(App):
                                          value=TaskImportance.MEDIUM, allow_blank=False)
                 yield Button("Add Task", variant="primary", id="add_task_button")
         yield Footer()
-
-    def watch_current_activity(self, new_activity: AppActivity) -> None:
-        if new_activity is None:
-            return
-
-        tic = self.query_one("#todo_items", ScrollableContainer)
-        stic = self.query_one("#todo_subitems", ScrollableContainer)
-
-        if new_activity == AppActivity.FOCUS_TASKS:
-            stic.disabled = True
-            tic.disabled = False
-        elif new_activity == AppActivity.FOCUS_SUBTASKS:
-            tic.disabled = True
-            stic.disabled = False
 
     async def watch_subtasks(self) -> None:
         """
@@ -197,12 +181,12 @@ class TodoApp(App):
         :param updated_tasks:
         :return:
         """
-        await self.render_tasks()
         try:
-            tl = self.query_one("#new_todo_items", TodoList)
-            tl.update_options(self.tasks)
+            tl = self.query_one("#todo_items", NewTodoList)
+            await tl.set_tasks(self.tasks)
         except NoMatches:
             pass
+
         save_tasks(updated_tasks)
 
     async def render_subtasks(self) -> None:
@@ -214,21 +198,6 @@ class TodoApp(App):
         await subtasks_container.remove_children()
 
         await subtasks_container.mount_all([Label(st.title) for st in self.subtasks])
-
-    async def render_tasks(self) -> None:
-        """
-
-        :return:
-        """
-        tasks_container = self.query_one("#todo_items", ScrollableContainer)
-        await tasks_container.remove_children()
-
-        await tasks_container.mount_all([TodoItem(t) for t in self.tasks])
-
-        if self.to_reselect is not None:
-            task = self.query_one(f"#{self.to_reselect}", TodoItem)
-            task.focus()
-            self.to_reselect = None
 
     def get_task_by_id(self, task_id: str) -> MainTask | None:
         """Search for a MainTask by id and return it if found"""
@@ -271,7 +240,7 @@ class TodoApp(App):
     def on_mount(self):
         self.current_activity = AppActivity.FOCUS_TASKS
 
-    def on_todo_item_add_subtask(self, message: TodoItem.AddSubtask) -> None:
+    def on_new_todo_list_add_subtask(self, message: NewTodoList.AddSubtask) -> None:
         """
 
         :param message:
@@ -288,12 +257,13 @@ class TodoApp(App):
         self.to_reselect = uuid_to_id(t.id)
         self.mutate_reactive(TodoApp.tasks)
 
-    def on_todo_item_task_selected(self, message: TodoItem.TaskSelected) -> None:
+    def on_new_todo_list_task_selected(self, message: NewTodoList.TaskSelected) -> None:
         """
 
         :param message:
         :return:
         """
+        print(f"Selected task: {message.task_id}")
         t = self.get_task_by_id(message.task_id)
         if t is None:
             return
@@ -301,7 +271,7 @@ class TodoApp(App):
         self.selected_task_title = t.title
         self.subtasks = sort_subtasks(t.subTasks)
 
-    def on_todo_item_update_task_state(self, message: TodoItem.UpdateTaskState) -> None:
+    def on_new_todo_list_update_task_state(self, message: NewTodoList.UpdateTaskState) -> None:
         """
 
         :param message:
