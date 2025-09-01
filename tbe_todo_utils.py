@@ -3,7 +3,8 @@ import pathlib
 
 from typing import List
 
-from tbe_todo_types import MainTask, Task, TaskImportance, TaskState
+from models import MainTask, Task
+from models.enums import TaskImportance, TaskState
 
 
 TODO_FILE = "todo_list.json"

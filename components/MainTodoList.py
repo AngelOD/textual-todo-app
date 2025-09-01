@@ -3,11 +3,12 @@ from typing import List, Optional
 from textual.message import Message
 from textual.widgets import ListView, ListItem, Label
 
-from tbe_todo_types import MainTask, TaskImportance, TaskState
+from models import MainTask
+from models.enums import TaskImportance, TaskState
 from tbe_todo_utils import id_to_uuid, uuid_to_id, format_task_title
 
 
-class NewTodoList(ListView):
+class MainTodoList(ListView):
     """
     A ListView-based widget for MainTask entries that:
     - Accepts MainTask instances
@@ -37,9 +38,9 @@ class NewTodoList(ListView):
 
         selected_task = self.get_selected_task()
         if selected_task is None:
-            self.post_message(NewTodoList.TaskSelected(task_id=""))
+            self.post_message(MainTodoList.TaskSelected(task_id=""))
 
-        self.post_message(NewTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
+        self.post_message(MainTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         current_task = self.get_selected_task()
@@ -58,7 +59,7 @@ class NewTodoList(ListView):
         if selected_task is None:
             return
 
-        self.post_message(NewTodoList.AddSubtask(task_id=id_to_uuid(selected_task.id)))
+        self.post_message(MainTodoList.AddSubtask(task_id=id_to_uuid(selected_task.id)))
 
 
     # ----- Public API -----
@@ -131,14 +132,9 @@ class NewTodoList(ListView):
     # ----- Internal helpers -----
 
     def _importance_sort_key(self, task: MainTask) -> int:
-        order = {
-            TaskImportance.CRITICAL: 0,
-            TaskImportance.HIGH: 1,
-            TaskImportance.MEDIUM: 2,
-            TaskImportance.LOW: 3,
-            TaskImportance.NEGLIGIBLE: 4,
-        }
-        return order.get(task.importance, 2)
+        state_multiplier = 10 if task.state == TaskState.COMPLETED else 1
+
+        return list(TaskImportance).index(task.importance) * state_multiplier
 
     def _make_item(self, task: MainTask) -> ListItem:
         item_id = uuid_to_id(task.id)

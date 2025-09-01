@@ -9,9 +9,10 @@ from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Static, Input, Select, Button, Label
 
-from tbe_todo_types import AppActivity, MainTask, Task, TaskImportance, TaskState
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks, uuid_to_id
-from components.NewTodoList import NewTodoList
+from models import MainTask, Task
+from models.enums import AppActivity, TaskImportance, TaskState
+from components import MainTodoList
 
 
 class TodoItem(Static, can_focus=True):
@@ -133,7 +134,6 @@ class TodoApp(App):
     subtasks: reactive[List[Task]] = reactive([])
     selected_task_title: reactive[str] = reactive("")
     tasks: reactive[List[MainTask]] = reactive(sort_tasks(load_tasks()))
-    to_reselect: str | None = None
 
     def compose(self) -> ComposeResult:
         """
@@ -143,7 +143,7 @@ class TodoApp(App):
         yield Header()
         with Vertical():
             with Horizontal():
-                yield NewTodoList(self.tasks, id="todo_items")
+                yield MainTodoList(self.tasks, id="todo_items")
                 with Vertical():
                     yield Label("Test", id="subtasks_title")
                     yield ScrollableContainer(name="todo_subitems", id="todo_subitems", can_focus=False,
@@ -182,7 +182,7 @@ class TodoApp(App):
         :return:
         """
         try:
-            tl = self.query_one("#todo_items", NewTodoList)
+            tl = self.query_one("#todo_items", MainTodoList)
             await tl.set_tasks(self.tasks)
         except NoMatches:
             pass
@@ -240,7 +240,7 @@ class TodoApp(App):
     def on_mount(self):
         self.current_activity = AppActivity.FOCUS_TASKS
 
-    def on_new_todo_list_add_subtask(self, message: NewTodoList.AddSubtask) -> None:
+    def on_new_todo_list_add_subtask(self, message: MainTodoList.AddSubtask) -> None:
         """
 
         :param message:
@@ -257,7 +257,7 @@ class TodoApp(App):
         self.to_reselect = uuid_to_id(t.id)
         self.mutate_reactive(TodoApp.tasks)
 
-    def on_new_todo_list_task_selected(self, message: NewTodoList.TaskSelected) -> None:
+    def on_new_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
         """
 
         :param message:
@@ -271,7 +271,7 @@ class TodoApp(App):
         self.selected_task_title = t.title
         self.subtasks = sort_subtasks(t.subTasks)
 
-    def on_new_todo_list_update_task_state(self, message: NewTodoList.UpdateTaskState) -> None:
+    def on_new_todo_list_update_task_state(self, message: MainTodoList.UpdateTaskState) -> None:
         """
 
         :param message:
@@ -282,7 +282,6 @@ class TodoApp(App):
             return
 
         t.state = message.task_state
-        self.to_reselect = uuid_to_id(t.id)
         sorted_tasks = sort_tasks(self.tasks)
         if sorted_tasks == self.tasks:
             self.mutate_reactive(TodoApp.tasks)
