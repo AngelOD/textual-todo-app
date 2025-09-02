@@ -167,7 +167,7 @@ class SubTodoList(ListView):
         highlighted_id = self._get_current_highlighted_id()
 
         # Sort tasks by importance and build new items
-        sorted_tasks = sorted(self._tasks, key=self._importance_sort_key)
+        sorted_tasks = sorted(self._tasks)
         desired_ids = [uuid_to_id(t.id) for t in sorted_tasks]
 
         # If the structure already matches, do an in-place label update; else rebuild

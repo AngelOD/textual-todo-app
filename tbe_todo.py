@@ -5,14 +5,13 @@ from typing import List
 from textual.app import App, ComposeResult
 from textual.containers import ScrollableContainer, Horizontal, Vertical
 from textual.css.query import NoMatches
-from textual.message import Message
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Static, Input, Select, Button, Label
+from textual.widgets import Footer, Header, Input, Select, Button, Label
 
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks, uuid_to_id
 from models import MainTask, Task
 from models.enums import AppActivity, TaskImportance, TaskState
-from components import MainTodoList
+from components import MainTodoList, SubTodoList
 
 
 class TodoApp(App):
@@ -40,8 +39,7 @@ class TodoApp(App):
                 yield MainTodoList(self.tasks, id="todo_items")
                 with Vertical():
                     yield Label("Test", id="subtasks_title")
-                    yield ScrollableContainer(name="todo_subitems", id="todo_subitems", can_focus=False,
-                                              can_focus_children=True)
+                    yield SubTodoList(self.subtasks, id="todo_subitems")
                     with Horizontal(id="add_subtask_container", disabled=True):
                         yield Input(id="add_subtask_input", placeholder="Subtask description")
                         yield Button("Add Subtask", variant="default", id="add_subtask_button")
@@ -58,7 +56,12 @@ class TodoApp(App):
         :param updated_subtasks:
         :return:
         """
-        await self.render_subtasks()
+        try:
+            tl = self.query_one("#todo_subitems", SubTodoList)
+            await tl.set_tasks(self.subtasks)
+            print(self.subtasks)
+        except NoMatches:
+            pass
 
     def watch_selected_task_title(self, updated_title: str) -> None:
         """
@@ -134,7 +137,7 @@ class TodoApp(App):
     def on_mount(self):
         self.current_activity = AppActivity.FOCUS_TASKS
 
-    def on_new_todo_list_add_subtask(self, message: MainTodoList.AddSubtask) -> None:
+    def on_main_todo_list_add_subtask(self, message: MainTodoList.AddSubtask) -> None:
         """
 
         :param message:
@@ -148,10 +151,9 @@ class TodoApp(App):
         subtask_input = self.query_one("#add_subtask_input", Input)
 
         t.subTasks = sort_subtasks(t.subTasks + [Task(title="Test subtask")])
-        self.to_reselect = uuid_to_id(t.id)
         self.mutate_reactive(TodoApp.tasks)
 
-    def on_new_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
+    def on_main_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
         """
 
         :param message:
@@ -165,7 +167,7 @@ class TodoApp(App):
         self.selected_task_title = t.title
         self.subtasks = sort_subtasks(t.subTasks)
 
-    def on_new_todo_list_update_task_state(self, message: MainTodoList.UpdateTaskState) -> None:
+    def on_main_todo_list_update_task_state(self, message: MainTodoList.UpdateTaskState) -> None:
         """
 
         :param message:

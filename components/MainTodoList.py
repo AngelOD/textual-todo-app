@@ -129,11 +129,6 @@ class MainTodoList(ListView):
 
     # ----- Internal helpers -----
 
-    def _importance_sort_key(self, task: MainTask) -> int:
-        state_multiplier = 10 if task.state == TaskState.COMPLETED else 1
-
-        return list(TaskImportance).index(task.importance) * state_multiplier
-
     def _make_item(self, task: MainTask) -> ListItem:
         item_id = uuid_to_id(task.id)
         text = format_task_title(task)
