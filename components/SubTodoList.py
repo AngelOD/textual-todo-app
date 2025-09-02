@@ -1,15 +1,14 @@
 from typing import List, Optional
 
 from textual.message import Message
-from textual.widget import Widget
 from textual.widgets import ListView, ListItem, Label
 
-from models import MainTask
+from models import Task
 from models.enums import TaskImportance, TaskState
 from tbe_todo_utils import id_to_uuid, uuid_to_id, format_task_title
 
 
-class MainTodoList(ListView):
+class SubTodoList(ListView):
     """
     A ListView-based widget for MainTask entries
     """
@@ -22,9 +21,9 @@ class MainTodoList(ListView):
         ("+", "progress_task", "Next State")
     ]
 
-    def __init__(self, tasks: Optional[List[MainTask]] = None, **kwargs):
+    def __init__(self, tasks: Optional[List[Task]] = None, **kwargs):
         super().__init__(**kwargs)
-        self._tasks: List[MainTask] = []
+        self._tasks: List[Task] = []
         self._tasks_waiting = tasks or []
 
     def on_mount(self):
@@ -36,9 +35,9 @@ class MainTodoList(ListView):
 
         selected_task = self.get_selected_task()
         if selected_task is None:
-            self.post_message(MainTodoList.TaskSelected(task_id=""))
+            self.post_message(SubTodoList.TaskSelected(task_id=""))
 
-        self.post_message(MainTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
+        self.post_message(SubTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
         current_task = self.get_selected_task()
@@ -57,22 +56,22 @@ class MainTodoList(ListView):
         if selected_task is None:
             return
 
-        self.post_message(MainTodoList.AddSubtask(task_id=id_to_uuid(selected_task.id)))
+        self.post_message(SubTodoList.AddSubtask(task_id=id_to_uuid(selected_task.id)))
 
 
     # ----- Public API -----
 
-    async def set_tasks(self, tasks: List[MainTask]) -> None:
+    async def set_tasks(self, tasks: List[Task]) -> None:
         """Replace the entire list of tasks and refresh the view, preserving selection."""
         self._tasks = list(tasks)
         await self._refresh_items_preserving_selection()
 
-    async def add_task(self, task: MainTask) -> None:
+    async def add_task(self, task: Task) -> None:
         """Add a task and refresh the view with sorting and selection preservation."""
         self._tasks.append(task)
         await self._refresh_items_preserving_selection()
 
-    async def update_task(self, updated_task: MainTask) -> None:
+    async def update_task(self, updated_task: Task) -> None:
         """Upsert a task (matched by id) and refresh the view with sorting and selection preservation."""
         for idx, t in enumerate(self._tasks):
             if t.id == updated_task.id:
@@ -88,7 +87,7 @@ class MainTodoList(ListView):
         self._tasks = [t for t in self._tasks if t.id != task_id]
         await self._refresh_items_preserving_selection()
 
-    def get_selected_task(self) -> Optional[MainTask]:
+    def get_selected_task(self) -> Optional[Task]:
         """Return the currently selected task, or None if no task is selected."""
         selected_item_id = self._get_current_highlighted_id()
         if selected_item_id is None:
@@ -129,12 +128,7 @@ class MainTodoList(ListView):
 
     # ----- Internal helpers -----
 
-    def _importance_sort_key(self, task: MainTask) -> int:
-        state_multiplier = 10 if task.state == TaskState.COMPLETED else 1
-
-        return list(TaskImportance).index(task.importance) * state_multiplier
-
-    def _make_item(self, task: MainTask) -> ListItem:
+    def _make_item(self, task: Task) -> ListItem:
         item_id = uuid_to_id(task.id)
         text = format_task_title(task)
         return ListItem(Label(text), id=item_id)
@@ -173,7 +167,7 @@ class MainTodoList(ListView):
         highlighted_id = self._get_current_highlighted_id()
 
         # Sort tasks by importance and build new items
-        sorted_tasks = sorted(self._tasks)
+        sorted_tasks = sorted(self._tasks, key=self._importance_sort_key)
         desired_ids = [uuid_to_id(t.id) for t in sorted_tasks]
 
         # If the structure already matches, do an in-place label update; else rebuild
@@ -184,6 +178,7 @@ class MainTodoList(ListView):
 
         if rebuild:
             # Rebuild entirely
+            # Clear existing children (ListView supports dynamic changes to children)
             for child in list(self.children):
                 await child.remove()
 

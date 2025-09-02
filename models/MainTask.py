@@ -25,3 +25,20 @@ class MainTask(Task):
             importance=TaskImportance(data["importance"]),
             subTasks=[Task.from_dict(t) for t in data["subTasks"]]
         )
+
+    def __lt__(self, other):
+        print('MainTask.__lt__')
+
+        if not isinstance(other, MainTask):
+            if isinstance(other, Task):
+                return super().__lt__(other)
+            return False
+
+        if self.is_completed() != other.is_completed():
+            return other.is_completed()
+
+        if self.importance != other.importance:
+            importance_order = list(TaskImportance)
+            return importance_order.index(self.importance) < importance_order.index(other.importance)
+
+        return self.title < other.title
