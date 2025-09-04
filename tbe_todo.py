@@ -8,9 +8,9 @@ from textual.css.query import NoMatches
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Input, Select, Button, Label
 
-from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks, uuid_to_id
+from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks
 from models import MainTask, Task
-from models.enums import AppActivity, TaskImportance, TaskState
+from models.enums import TaskImportance
 from components import MainTodoList, SubTodoList
 
 
@@ -18,13 +18,11 @@ class TodoApp(App):
     CSS_PATH = 'tbe_todo.tcss'
     BINDINGS = [
         ("a", "add_task", "Add Task"),
-        ("escape", "focus_tasks", "Go to tasks"),
-        ("enter", "focus_subtasks", "Go to subtasks"),
         ("q", "quit", "Quit")
     ]
 
-    current_activity: reactive[AppActivity] = reactive(None)
     subtasks: reactive[List[Task]] = reactive([])
+    selected_task_id: reactive[str] = reactive("")
     selected_task_title: reactive[str] = reactive("")
     tasks: reactive[List[MainTask]] = reactive(sort_tasks(load_tasks()))
 
@@ -105,20 +103,7 @@ class TodoApp(App):
         return None
 
     def action_add_task(self):
-        """Handler for "add task" keypress"""
-        add_container = self.query_one("#add_task_container", Horizontal)
-        task_input = self.query_one("#add_task_input", Input)
-
-        add_container.disabled = False
-        task_input.focus()
-
-    def action_focus_subtasks(self):
-        """ """
-        self.current_activity = AppActivity.FOCUS_SUBTASKS
-
-    def action_focus_tasks(self):
-        """ """
-        self.current_activity = AppActivity.FOCUS_TASKS
+        self._enable_add_task()
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "add_task_button":
@@ -134,9 +119,6 @@ class TodoApp(App):
                 MainTask(title=title_input.value.strip(), importance=TaskImportance(importance_select.selection))])
             add_container.disabled = True
 
-    def on_mount(self):
-        self.current_activity = AppActivity.FOCUS_TASKS
-
     def on_main_todo_list_add_subtask(self, message: MainTodoList.AddSubtask) -> None:
         """
 
@@ -147,11 +129,15 @@ class TodoApp(App):
         if t is None:
             return
 
-        add_container = self.query_one("#add_subtask_container", Horizontal)
-        subtask_input = self.query_one("#add_subtask_input", Input)
+        self._enable_add_subtask()
 
-        t.subTasks = sort_subtasks(t.subTasks + [Task(title="Test subtask")])
-        self.mutate_reactive(TodoApp.tasks)
+        # t.subTasks = sort_subtasks(t.subTasks + [Task(title="Test subtask")])
+        # self.mutate_reactive(TodoApp.tasks)
+        # self.subtasks = t.subTasks
+
+    def on_main_todo_list_focused(self) -> None:
+        self._disable_add_task()
+        self._disable_add_subtask()
 
     def on_main_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
         """
@@ -159,11 +145,13 @@ class TodoApp(App):
         :param message:
         :return:
         """
-        print(f"Selected task: {message.task_id}")
         t = self.get_task_by_id(message.task_id)
         if t is None:
+            self.selected_task_id = ""
+            self.selected_task_title = ""
             return
 
+        self.selected_task_id = t.id
         self.selected_task_title = t.title
         self.subtasks = sort_subtasks(t.subTasks)
 
@@ -183,6 +171,37 @@ class TodoApp(App):
             self.mutate_reactive(TodoApp.tasks)
         else:
             self.tasks = sorted_tasks
+
+
+    # ----- Internal helpers -----
+
+    def _disable_add_subtask(self) -> None:
+        self._get_add_subtask_container().disabled = True
+        self._get_add_subtask_input().clear()
+
+    def _disable_add_task(self) -> None:
+        self._get_add_task_container().disabled = True
+        self._get_add_task_input().clear()
+
+    def _get_add_subtask_container(self) -> Horizontal:
+        return self.query_one("#add_subtask_container", Horizontal)
+
+    def _get_add_subtask_input(self) -> Input:
+        return self.query_one("#add_subtask_input", Input)
+
+    def _get_add_task_container(self) -> Horizontal:
+        return self.query_one("#add_task_container", Horizontal)
+
+    def _get_add_task_input(self) -> Input:
+        return self.query_one("#add_task_input", Input)
+
+    def _enable_add_subtask(self) -> None:
+        self._get_add_subtask_container().disabled = False
+        self._get_add_subtask_input().focus()
+
+    def _enable_add_task(self) -> None:
+        self._get_add_task_container().disabled = False
+        self._get_add_task_input().focus()
 
 
 if __name__ == "__main__":

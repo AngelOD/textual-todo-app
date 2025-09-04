@@ -27,8 +27,6 @@ class MainTask(Task):
         )
 
     def __lt__(self, other):
-        print('MainTask.__lt__')
-
         if not isinstance(other, MainTask):
             if isinstance(other, Task):
                 return super().__lt__(other)

@@ -1,11 +1,11 @@
 from typing import List, Optional
 
+from textual.events import Focus
 from textual.message import Message
-from textual.widget import Widget
 from textual.widgets import ListView, ListItem, Label
 
 from models import MainTask
-from models.enums import TaskImportance, TaskState
+from models.enums import TaskState
 from tbe_todo_utils import id_to_uuid, uuid_to_id, format_task_title
 
 
@@ -30,6 +30,9 @@ class MainTodoList(ListView):
     def on_mount(self):
         self.set_tasks(self._tasks_waiting)
         self._tasks_waiting = []
+
+    def on_focus(self):
+        self.post_message(MainTodoList.Focused())
 
     def on_list_view_highlighted(self) -> None:
         self.refresh_bindings()
@@ -59,6 +62,25 @@ class MainTodoList(ListView):
 
         self.post_message(MainTodoList.AddSubtask(task_id=id_to_uuid(selected_task.id)))
 
+    def action_complete_task(self) -> None:
+        self._update_task_state(TaskState.COMPLETED)
+
+    def action_progress_task(self) -> None:
+        selected_task = self.get_selected_task()
+        if selected_task is None:
+            return
+
+        self._update_task_state(selected_task.state.next())
+
+    def action_regress_task(self) -> None:
+        selected_task = self.get_selected_task()
+        if selected_task is None:
+            return
+
+        self._update_task_state(selected_task.state.prev())
+
+    def action_renew_task(self) -> None:
+        self._update_task_state(TaskState.NEW)
 
     # ----- Public API -----
 
@@ -110,6 +132,12 @@ class MainTodoList(ListView):
         def __init__(self, task_id: str) -> None:
             super().__init__()
             self.task_id = task_id
+
+    class Focused(Message):
+        """Message indicating that the widget was focused"""
+
+        def __init__(self) -> None:
+            super().__init__()
 
     class TaskSelected(Message):
         """Message notifying the system that a specific task has been selected"""
@@ -220,3 +248,12 @@ class MainTodoList(ListView):
                     self.index = 0
                 except Exception:
                     pass
+
+    def _update_task_state(self, task_state: TaskState) -> None:
+        selected_task = self.get_selected_task()
+
+        if selected_task is None:
+            return
+
+        self.post_message(
+            MainTodoList.UpdateTaskState(task_id=id_to_uuid(selected_task.id), task_state=task_state))

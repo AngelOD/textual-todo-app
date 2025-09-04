@@ -65,21 +65,11 @@ def save_tasks(tasks: List[MainTask]) -> None:
 
 
 def sort_subtasks(tasks: List[Task]) -> List[Task]:
-    return [t for t in tasks if t.state != TaskState.COMPLETED] + \
-        [t for t in tasks if t.state == TaskState.COMPLETED]
+    return sorted(tasks)
 
 
 def sort_tasks(tasks: List[MainTask]) -> List[MainTask]:
-    desired_order = list(TaskImportance)
-    new_tasks = []
-
-    unfinished_tasks = [t for t in tasks if t.state != TaskState.COMPLETED]
-    finished_tasks = [t for t in tasks if t.state == TaskState.COMPLETED]
-
-    for importance in desired_order:
-        new_tasks += [t for t in unfinished_tasks if t.importance == importance]
-
-    return new_tasks + finished_tasks
+    return sorted(tasks)
 
 
 def uuid_to_id(uuid_to_convert: str) -> str:
