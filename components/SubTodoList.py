@@ -26,8 +26,8 @@ class SubTodoList(ListView):
         self._tasks: List[Task] = []
         self._tasks_waiting = tasks or []
 
-    def on_mount(self):
-        self.set_tasks(self._tasks_waiting)
+    async def on_mount(self):
+        await self.set_tasks(self._tasks_waiting)
         self._tasks_waiting = []
 
     def on_list_view_highlighted(self) -> None:

@@ -3,8 +3,7 @@ import uuid
 from typing import List
 
 from textual.app import App, ComposeResult
-from textual.containers import ScrollableContainer, Horizontal, Vertical
-from textual.css.query import NoMatches
+from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
 from textual.widgets import Footer, Header, Input, Select, Button, Label
 
@@ -23,20 +22,16 @@ class TodoApp(App):
 
     subtasks: reactive[List[Task]] = reactive([])
     selected_task_id: reactive[str] = reactive("")
-    selected_task_title: reactive[str] = reactive("")
+    selected_task_title: reactive[str] = reactive("[No task selected]")
     tasks: reactive[List[MainTask]] = reactive(sort_tasks(load_tasks()))
 
     def compose(self) -> ComposeResult:
-        """
-
-        :return:
-        """
         yield Header()
         with Vertical():
             with Horizontal():
                 yield MainTodoList(self.tasks, id="todo_items")
                 with Vertical():
-                    yield Label("Test", id="subtasks_title")
+                    yield Label("Testing", id="subtasks_title")
                     yield SubTodoList(self.subtasks, id="todo_subitems")
                     with Horizontal(id="add_subtask_container", disabled=True):
                         yield Input(id="add_subtask_input", placeholder="Subtask description")
@@ -49,53 +44,16 @@ class TodoApp(App):
         yield Footer()
 
     async def watch_subtasks(self) -> None:
-        """
+        await self._get_subtasks_list().set_tasks(self.subtasks)
 
-        :param updated_subtasks:
-        :return:
-        """
-        try:
-            tl = self.query_one("#todo_subitems", SubTodoList)
-            await tl.set_tasks(self.subtasks)
-            print(self.subtasks)
-        except NoMatches:
-            pass
-
-    def watch_selected_task_title(self, updated_title: str) -> None:
-        """
-
-        :param updated_title:
-        :return:
-        """
-        title = self.query_one("#subtasks_title", Label)
-        title.update(updated_title)
+    def watch_selected_task_title(self) -> None:
+        self._get_subtasks_title().update(content=self.selected_task_title, layout=False)
 
     async def watch_tasks(self, updated_tasks: List[MainTask]) -> None:
-        """
-
-        :param updated_tasks:
-        :return:
-        """
-        try:
-            tl = self.query_one("#todo_items", MainTodoList)
-            await tl.set_tasks(self.tasks)
-        except NoMatches:
-            pass
-
+        await self._get_tasks_list().set_tasks(self.tasks)
         save_tasks(updated_tasks)
 
-    async def render_subtasks(self) -> None:
-        """
-
-        :return:
-        """
-        subtasks_container = self.query_one("#todo_subitems", ScrollableContainer)
-        await subtasks_container.remove_children()
-
-        await subtasks_container.mount_all([Label(st.title) for st in self.subtasks])
-
     def get_task_by_id(self, task_id: str) -> MainTask | None:
-        """Search for a MainTask by id and return it if found"""
         for task in self.tasks:
             if task.id == task_id:
                 return task
@@ -107,9 +65,8 @@ class TodoApp(App):
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "add_task_button":
-            add_container = self.query_one("#add_task_container", Horizontal)
-            title_input = self.query_one("#add_task_input", Input)
-            importance_select = self.query_one("#add_task_importance", Select)
+            title_input = self._get_add_task_input()
+            importance_select = self._get_add_task_importance()
 
             if title_input.value.strip() == "":
                 self.notify("Missing task description", severity="warning", title="Incomplete input")
@@ -117,34 +74,39 @@ class TodoApp(App):
 
             self.tasks = sort_tasks(self.tasks + [
                 MainTask(title=title_input.value.strip(), importance=TaskImportance(importance_select.selection))])
-            add_container.disabled = True
+            self._disable_add_task()
+        elif event.button.id == "add_subtask_button":
+            t = self.get_task_by_id(self.selected_task_id)
+            if t is None:
+                self.notify("No task selected", severity="error", title="Unable to add subtask")
+                return
+
+            title_input = self._get_add_subtask_input()
+
+            if title_input.value.strip() == "":
+                self.notify("Missing subtask description", severity="warning", title="Incomplete input")
+                return
+
+            t.subTasks = sort_subtasks(t.subTasks + [Task(title=title_input.value.strip())])
+            self.mutate_reactive(TodoApp.tasks)
+            self.subtasks = t.subTasks
+            self._disable_add_subtask()
 
     def on_main_todo_list_add_subtask(self, message: MainTodoList.AddSubtask) -> None:
-        """
-
-        :param message:
-        :return:
-        """
         t = self.get_task_by_id(message.task_id)
         if t is None:
             return
 
         self._enable_add_subtask()
 
-        # t.subTasks = sort_subtasks(t.subTasks + [Task(title="Test subtask")])
-        # self.mutate_reactive(TodoApp.tasks)
-        # self.subtasks = t.subTasks
-
     def on_main_todo_list_focused(self) -> None:
         self._disable_add_task()
         self._disable_add_subtask()
 
-    def on_main_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
-        """
+    def on_main_todo_list_open_subtasks(self) -> None:
+        self._get_subtasks_list().focus()
 
-        :param message:
-        :return:
-        """
+    def on_main_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
         t = self.get_task_by_id(message.task_id)
         if t is None:
             self.selected_task_id = ""
@@ -156,11 +118,6 @@ class TodoApp(App):
         self.subtasks = sort_subtasks(t.subTasks)
 
     def on_main_todo_list_update_task_state(self, message: MainTodoList.UpdateTaskState) -> None:
-        """
-
-        :param message:
-        :return:
-        """
         t = self.get_task_by_id(message.task_id)
         if t is None:
             return
@@ -192,8 +149,20 @@ class TodoApp(App):
     def _get_add_task_container(self) -> Horizontal:
         return self.query_one("#add_task_container", Horizontal)
 
+    def _get_add_task_importance(self) -> Select:
+        return self.query_one("#add_task_importance", Select)
+
     def _get_add_task_input(self) -> Input:
         return self.query_one("#add_task_input", Input)
+
+    def _get_subtasks_list(self) -> SubTodoList:
+        return self.query_one("#todo_subitems", SubTodoList)
+
+    def _get_subtasks_title(self) -> Label:
+        return self.query_one("#subtasks_title", Label)
+
+    def _get_tasks_list(self) -> MainTodoList:
+        return self.query_one("#todo_items", MainTodoList)
 
     def _enable_add_subtask(self) -> None:
         self._get_add_subtask_container().disabled = False

@@ -1,6 +1,5 @@
 from typing import List, Optional
 
-from textual.events import Focus
 from textual.message import Message
 from textual.widgets import ListView, ListItem, Label
 
@@ -27,8 +26,8 @@ class MainTodoList(ListView):
         self._tasks: List[MainTask] = []
         self._tasks_waiting = tasks or []
 
-    def on_mount(self):
-        self.set_tasks(self._tasks_waiting)
+    async def on_mount(self):
+        await self.set_tasks(self._tasks_waiting)
         self._tasks_waiting = []
 
     def on_focus(self):
@@ -135,6 +134,12 @@ class MainTodoList(ListView):
 
     class Focused(Message):
         """Message indicating that the widget was focused"""
+
+        def __init__(self) -> None:
+            super().__init__()
+
+    class OpenSubtasks(Message):
+        """Message requesting that subtasks list is focused"""
 
         def __init__(self) -> None:
             super().__init__()
