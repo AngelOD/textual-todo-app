@@ -14,6 +14,7 @@ class MainTodoList(ListView):
     """
 
     BINDINGS = [
+        ("e", "edit_task", "Edit Task"),
         ("s", "add_subtask", "Add Subtask"),
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
@@ -34,24 +35,11 @@ class MainTodoList(ListView):
         self.post_message(MainTodoList.Focused())
 
     def on_list_view_highlighted(self) -> None:
-        self.refresh_bindings()
-
         selected_task = self.get_selected_task()
         if selected_task is None:
             self.post_message(MainTodoList.TaskSelected(task_id=""))
 
         self.post_message(MainTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
-
-    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        current_task = self.get_selected_task()
-
-        if current_task is None:
-            return True
-
-        if action == "complete_task" and current_task.state == TaskState.COMPLETED:
-            return False
-
-        return True
 
     def action_add_subtask(self) -> None:
         selected_task = self.get_selected_task()
@@ -63,6 +51,14 @@ class MainTodoList(ListView):
 
     def action_complete_task(self) -> None:
         self._update_task_state(TaskState.COMPLETED)
+
+    def action_edit_task(self) -> None:
+        selected_task = self.get_selected_task()
+
+        if selected_task is None:
+            return
+
+        self.post_message(MainTodoList.EditTask(task_id=id_to_uuid(selected_task.id)))
 
     def action_progress_task(self) -> None:
         selected_task = self.get_selected_task()
@@ -132,14 +128,15 @@ class MainTodoList(ListView):
             super().__init__()
             self.task_id = task_id
 
+    class EditTask(Message):
+        """Message requesting editing a task"""
+
+        def __init__(self, task_id: str) -> None:
+            super().__init__()
+            self.task_id = task_id
+
     class Focused(Message):
         """Message indicating that the widget was focused"""
-
-        def __init__(self) -> None:
-            super().__init__()
-
-    class OpenSubtasks(Message):
-        """Message requesting that subtasks list is focused"""
 
         def __init__(self) -> None:
             super().__init__()
@@ -251,6 +248,7 @@ class MainTodoList(ListView):
             if items:
                 try:
                     self.index = 0
+                    self.mutate_reactive(MainTodoList.index)
                 except Exception:
                     pass
 

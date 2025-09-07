@@ -29,7 +29,14 @@ def format_task_title(task: Task):
             wrapper = "[strike][dim]"
             wrapper_end = "[/][/]"
 
-    suffix = f" ({task.importance.value[0].upper()})" if isinstance(task, MainTask) else ""
+    suffix = ""
+    if isinstance(task, MainTask):
+        suffix = f" ({task.importance.value[0].upper()})"
+
+        if task.subTasks is not None and len(task.subTasks) > 0:
+            task_count = len(task.subTasks)
+            completed_task_count = sum(1 for subtask in task.subTasks if subtask.state == TaskState.COMPLETED)
+            suffix += f" [{completed_task_count}/{task_count}]"
 
     return f"{marker} {wrapper}{task.title}{wrapper_end}{suffix}"
 

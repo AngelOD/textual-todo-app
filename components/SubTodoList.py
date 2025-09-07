@@ -4,7 +4,7 @@ from textual.message import Message
 from textual.widgets import ListView, ListItem, Label
 
 from models import Task
-from models.enums import TaskImportance, TaskState
+from models.enums import TaskState
 from tbe_todo_utils import id_to_uuid, uuid_to_id, format_task_title
 
 
@@ -14,11 +14,9 @@ class SubTodoList(ListView):
     """
 
     BINDINGS = [
-        ("s", "add_subtask", "Add Subtask"),
+        ("e", "edit_task", "Edit Task"),
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
-        ("-", "regress_task", "Prev State"),
-        ("+", "progress_task", "Next State")
     ]
 
     def __init__(self, tasks: Optional[List[Task]] = None, **kwargs):
@@ -30,33 +28,21 @@ class SubTodoList(ListView):
         await self.set_tasks(self._tasks_waiting)
         self._tasks_waiting = []
 
-    def on_list_view_highlighted(self) -> None:
-        self.refresh_bindings()
+    def on_focus(self):
+        self.post_message(SubTodoList.Focused())
 
+    def action_complete_task(self) -> None:
+        self._update_task_state(TaskState.COMPLETED)
+
+    def action_edit_task(self) -> None:
         selected_task = self.get_selected_task()
-        if selected_task is None:
-            self.post_message(SubTodoList.TaskSelected(task_id=""))
-
-        self.post_message(SubTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
-
-    def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        current_task = self.get_selected_task()
-
-        if current_task is None:
-            return True
-
-        if action == "complete_task" and current_task.state == TaskState.COMPLETED:
-            return False
-
-        return True
-
-    def action_add_subtask(self) -> None:
-        selected_task = self.get_selected_task()
-
         if selected_task is None:
             return
 
-        self.post_message(SubTodoList.AddSubtask(task_id=id_to_uuid(selected_task.id)))
+        self.post_message(SubTodoList.EditTask(task_id=id_to_uuid(selected_task.id)))
+
+    def action_renew_task(self) -> None:
+        self._update_task_state(TaskState.NEW)
 
 
     # ----- Public API -----
@@ -103,19 +89,18 @@ class SubTodoList(ListView):
 
     # ----- Textual Message Classes -----
 
-    class AddSubtask(Message):
-        """Message requesting adding a subtask"""
+    class EditTask(Message):
+        """Message requesting editing a subtask"""
 
         def __init__(self, task_id: str) -> None:
             super().__init__()
             self.task_id = task_id
 
-    class TaskSelected(Message):
-        """Message notifying the system that a specific task has been selected"""
+    class Focused(Message):
+        """Message indicating that the widget was focused"""
 
-        def __init__(self, task_id: str) -> None:
+        def __init__(self) -> None:
             super().__init__()
-            self.task_id = task_id
 
     class UpdateTaskState(Message):
         """Message sending task update"""
@@ -218,5 +203,14 @@ class SubTodoList(ListView):
             if items:
                 try:
                     self.index = 0
+                    self.mutate_reactive(SubTodoList.index)
                 except Exception:
                     pass
+
+    def _update_task_state(self, task_state: TaskState) -> None:
+        selected_task = self.get_selected_task()
+
+        if selected_task is None:
+            return
+
+        self.post_message(SubTodoList.UpdateTaskState(task_id=id_to_uuid(selected_task.id), task_state=task_state))
