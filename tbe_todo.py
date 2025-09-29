@@ -17,6 +17,8 @@ class TodoApp(App):
     CSS_PATH = 'tbe_todo.tcss'
     BINDINGS = [
         ("a", "add_task", "Add Task"),
+        ("s", "add_subtask", "Add Subtask"),
+        ("del", "delete_task", "Delete Task"),
         ("q", "quit", "Quit")
     ]
 
@@ -57,6 +59,14 @@ class TodoApp(App):
 
     def action_add_task(self):
         self._enable_add_task()
+
+    def action_add_subtask(self):
+        if self._get_task_by_id(self.selected_task_id) is None:
+            self.notify("No task selected", severity="error", title="Unable to add subtask")
+            self._disable_add_subtask()
+            return
+
+        self._enable_add_subtask()
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "add_task_button":
