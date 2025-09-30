@@ -10,7 +10,7 @@ from textual.widgets import Footer, Header, Input, Select, Button, Label
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks
 from models import MainTask, Task
 from models.enums import TaskImportance
-from components import MainTodoList, SubTodoList
+from components import DeleteScreen, MainTodoList, SubTodoList
 
 
 class TodoApp(App):
@@ -18,7 +18,7 @@ class TodoApp(App):
     BINDINGS = [
         ("a", "add_task", "Add Task"),
         ("s", "add_subtask", "Add Subtask"),
-        ("del", "delete_task", "Delete Task"),
+        ("delete", "delete_task", "Delete Task"),
         ("q", "quit", "Quit")
     ]
 
@@ -67,6 +67,18 @@ class TodoApp(App):
             return
 
         self._enable_add_subtask()
+
+    def action_delete_task(self):
+        def check_delete(confirmed: bool|None) -> None:
+            if confirmed:
+                t = self._get_task_by_id(self.selected_task_id)
+                if t is None:
+                    return
+
+                self.tasks.remove(t)
+                self.mutate_reactive(TodoApp.tasks)
+
+        self.push_screen(DeleteScreen(), check_delete)
 
     def on_button_pressed(self, event: Button.Pressed):
         if event.button.id == "add_task_button":

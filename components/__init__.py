@@ -1,7 +1,7 @@
 from .AddSubtaskScreen import AddSubtaskScreen
 from .AddTaskScreen import AddTaskScreen
 from .MainTodoList import MainTodoList
-from .QuitScreen import QuitScreen
+from .DeleteScreen import DeleteScreen
 from .SubTodoList import SubTodoList
 
-__all__ = ["AddSubtaskScreen", "AddTaskScreen", "MainTodoList", "QuitScreen", "SubTodoList"]
+__all__ = ["AddSubtaskScreen", "AddTaskScreen", "MainTodoList", "DeleteScreen", "SubTodoList"]
