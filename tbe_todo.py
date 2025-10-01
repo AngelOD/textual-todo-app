@@ -5,12 +5,11 @@ from typing import List
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, Select, Button, Label
+from textual.widgets import Footer, Header, Input, Button, Label
 
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks
 from models import MainTask, Task
-from models.enums import TaskImportance
-from components import DeleteScreen, MainTodoList, SubTodoList
+from components import AddTaskScreen, DeleteScreen, MainTodoList, SubTodoList
 
 
 class TodoApp(App):
@@ -18,6 +17,7 @@ class TodoApp(App):
     BINDINGS = [
         ("a", "add_task", "Add Task"),
         ("s", "add_subtask", "Add Subtask"),
+        ("e", "edit_task", "Edit Task"),
         ("delete", "delete_task", "Delete Task"),
         ("q", "quit", "Quit")
     ]
@@ -40,11 +40,6 @@ class TodoApp(App):
                     with Horizontal(id="add_subtask_container", disabled=True):
                         yield Input(id="add_subtask_input", placeholder="Subtask description")
                         yield Button("Add Subtask", variant="default", id="add_subtask_button")
-            with Horizontal(id="add_task_container", disabled=True):
-                yield Input(id="add_task_input", placeholder="Task description")
-                yield Select.from_values(TaskImportance, id="add_task_importance", prompt="Importance",
-                                         value=TaskImportance.MEDIUM, allow_blank=False)
-                yield Button("Add Task", variant="primary", id="add_task_button")
         yield Footer()
 
     async def watch_subtasks(self) -> None:
@@ -58,7 +53,14 @@ class TodoApp(App):
         save_tasks(updated_tasks)
 
     def action_add_task(self):
-        self._enable_add_task()
+        def handle_add_task(task: MainTask|None) -> None:
+            if task is None:
+                return
+
+            self.tasks = sort_tasks(self.tasks + [task])
+            self.mutate_reactive(TodoApp.tasks)
+
+        self.push_screen(AddTaskScreen(), handle_add_task)
 
     def action_add_subtask(self):
         if self._get_task_by_id(self.selected_task_id) is None:
@@ -69,6 +71,11 @@ class TodoApp(App):
         self._enable_add_subtask()
 
     def action_delete_task(self):
+        t = self._get_task_by_id(self.selected_task_id)
+        if t is None:
+            self.notify("No task selected", severity="error", title="Unable to edit task")
+            return
+
         def check_delete(confirmed: bool|None) -> None:
             if confirmed:
                 t = self._get_task_by_id(self.selected_task_id)
@@ -80,31 +87,24 @@ class TodoApp(App):
 
         self.push_screen(DeleteScreen(), check_delete)
 
+    def action_edit_task(self):
+        t = self._get_task_by_id(self.selected_task_id)
+        if t is None:
+            self.notify("No task selected", severity="error", title="Unable to edit task")
+            return
+
+        def handle_edit_task(task: MainTask|None) -> None:
+            if task is None:
+                return
+
+            t.title = task.title
+            t.importance = task.importance
+            self.mutate_reactive(TodoApp.tasks)
+
+        self.push_screen(AddTaskScreen(t), handle_edit_task)
+
     def on_button_pressed(self, event: Button.Pressed):
-        if event.button.id == "add_task_button":
-            title_input = self._get_add_task_input()
-            importance_select = self._get_add_task_importance()
-
-            if title_input.value.strip() == "":
-                self.notify("Missing task description", severity="warning", title="Incomplete input")
-                return
-
-            if self.is_editing:
-                t = self._get_task_by_id(self.selected_task_id)
-                if t is None:
-                    self.notify("No task selected", severity="error", title="Unable to edit task")
-                    self._disable_add_task()
-                    return
-                t.title = title_input.value.strip()
-                t.importance = TaskImportance(importance_select.selection)
-                self.mutate_reactive(TodoApp.tasks)
-                self._disable_add_task()
-                return
-
-            self.tasks = sort_tasks(self.tasks + [
-                MainTask(title=title_input.value.strip(), importance=TaskImportance(importance_select.selection))])
-            self._disable_add_task()
-        elif event.button.id == "add_subtask_button":
+        if event.button.id == "add_subtask_button":
             t = self._get_task_by_id(self.selected_task_id)
             if t is None:
                 self.notify("No task selected", severity="error", title="Unable to add subtask")
@@ -141,18 +141,7 @@ class TodoApp(App):
 
         self._enable_add_subtask()
 
-    def on_main_todo_list_edit_task(self, message: MainTodoList.EditTask) -> None:
-        t = self._get_task_by_id(message.task_id)
-        if t is None:
-            return
-
-        self.selected_subtask_id = t.id
-        self._get_add_task_input().value = t.title
-        self._get_add_task_importance().value = t.importance
-        self._enable_edit_task()
-
     def on_main_todo_list_focused(self) -> None:
-        self._disable_add_task()
         self._disable_add_subtask()
 
     def on_main_todo_list_task_selected(self, message: MainTodoList.TaskSelected) -> None:
@@ -185,9 +174,14 @@ class TodoApp(App):
                 if subtask is None:
                     return
 
-                self.subtasks.remove(subtask)
-                self.mutate_reactive(TodoApp.subtasks)
+                task = self._get_task_by_id(self.selected_task_id)
+                if task is None:
+                    return
+
+                task.subTasks.remove(subtask)
                 self.mutate_reactive(TodoApp.tasks)
+                self.subtasks = task.subTasks
+                self.mutate_reactive(TodoApp.subtasks)
 
         self.push_screen(DeleteScreen(), check_delete)
 
@@ -201,7 +195,6 @@ class TodoApp(App):
         self._enable_edit_subtask()
 
     def on_sub_todo_list_focused(self) -> None:
-        self._disable_add_task()
         self._disable_add_subtask()
 
     def on_sub_todo_list_update_task_state(self, message: SubTodoList.UpdateTaskState) -> None:
@@ -220,11 +213,6 @@ class TodoApp(App):
         self._get_add_subtask_container().disabled = True
         self._get_add_subtask_input().clear()
 
-    def _disable_add_task(self) -> None:
-        self.is_editing = False
-        self._get_add_task_container().disabled = True
-        self._get_add_task_input().clear()
-
     def _get_add_subtask_button(self) -> Button:
         return self.query_one("#add_subtask_button", Button)
 
@@ -233,18 +221,6 @@ class TodoApp(App):
 
     def _get_add_subtask_input(self) -> Input:
         return self.query_one("#add_subtask_input", Input)
-
-    def _get_add_task_button(self) -> Button:
-        return self.query_one("#add_task_button", Button)
-
-    def _get_add_task_container(self) -> Horizontal:
-        return self.query_one("#add_task_container", Horizontal)
-
-    def _get_add_task_importance(self) -> Select:
-        return self.query_one("#add_task_importance", Select)
-
-    def _get_add_task_input(self) -> Input:
-        return self.query_one("#add_task_input", Input)
 
     def _get_subtask_by_id(self, task_id: str) -> Task | None:
         if self.subtasks is None or len(self.subtasks) == 0:
@@ -278,23 +254,11 @@ class TodoApp(App):
         self._get_add_subtask_button().label = "Add Subtask"
         self._get_add_subtask_input().focus()
 
-    def _enable_add_task(self) -> None:
-        self.is_editing = False
-        self._get_add_task_container().disabled = False
-        self._get_add_task_button().label = "Add Task"
-        self._get_add_task_input().focus()
-
     def _enable_edit_subtask(self) -> None:
         self.is_editing = True
         self._get_add_subtask_container().disabled = False
         self._get_add_subtask_button().label = "Save"
         self._get_add_subtask_input().focus()
-
-    def _enable_edit_task(self) -> None:
-        self.is_editing = True
-        self._get_add_task_container().disabled = False
-        self._get_add_task_button().label = "Save"
-        self._get_add_task_input().focus()
 
 
 if __name__ == "__main__":

@@ -14,7 +14,6 @@ class MainTodoList(ListView):
     """
 
     BINDINGS = [
-        ("e", "edit_task", "Edit Task"),
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
         ("-", "regress_task", "Prev State"),

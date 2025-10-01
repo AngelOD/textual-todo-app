@@ -16,7 +16,7 @@ class AddSubtaskScreen(ModalScreen[Task | None]):
             Input(id="add_subtask_input", placeholder="Subtask description"),
             Button("Add Subtask", variant="primary", id="add_subtask_button"),
             Button("Cancel", variant="error", id="cancel_add_subtask_button"),
-            id="add_subtask_dialog",
+            id="add_subtask_screen",
         )
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
