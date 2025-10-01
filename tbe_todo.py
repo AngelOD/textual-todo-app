@@ -178,6 +178,19 @@ class TodoApp(App):
         else:
             self.tasks = sorted_tasks
 
+    def on_sub_todo_list_delete_task(self, message: SubTodoList.DeleteTask) -> None:
+        def check_delete(confirmed: bool|None) -> None:
+            if confirmed:
+                subtask = self._get_subtask_by_id(message.task_id)
+                if subtask is None:
+                    return
+
+                self.subtasks.remove(subtask)
+                self.mutate_reactive(TodoApp.subtasks)
+                self.mutate_reactive(TodoApp.tasks)
+
+        self.push_screen(DeleteScreen(), check_delete)
+
     def on_sub_todo_list_edit_task(self, message: SubTodoList.EditTask) -> None:
         t = self._get_subtask_by_id(message.task_id)
         if t is None:

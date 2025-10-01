@@ -23,3 +23,7 @@ class AddTaskScreen(ModalScreen[MainTask|None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "cancel_add_task_button":
             self.dismiss(None)
+            return
+
+        # TODO Add validation
+        # TODO Add task

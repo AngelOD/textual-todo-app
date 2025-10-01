@@ -14,9 +14,10 @@ class SubTodoList(ListView):
     """
 
     BINDINGS = [
-        ("e", "edit_task", "Edit Task"),
+        ("e", "edit_task", "Edit Subtask"),
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
+        ("backspace", "delete_task", "Delete Subtask")
     ]
 
     def __init__(self, tasks: Optional[List[Task]] = None, **kwargs):
@@ -33,6 +34,13 @@ class SubTodoList(ListView):
 
     def action_complete_task(self) -> None:
         self._update_task_state(TaskState.COMPLETED)
+
+    def action_delete_task(self) -> None:
+        selected_task = self.get_selected_task()
+        if selected_task is None:
+            return
+
+        self.post_message(SubTodoList.DeleteTask(task_id=id_to_uuid(selected_task.id)))
 
     def action_edit_task(self) -> None:
         selected_task = self.get_selected_task()
@@ -88,6 +96,13 @@ class SubTodoList(ListView):
 
 
     # ----- Textual Message Classes -----
+
+    class DeleteTask(Message):
+        """Message requesting deleting a subtask"""
+
+        def __init__(self, task_id: str) -> None:
+            super().__init__()
+            self.task_id = task_id
 
     class EditTask(Message):
         """Message requesting editing a subtask"""
