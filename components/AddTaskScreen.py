@@ -6,6 +6,8 @@ from models import MainTask
 from models.enums import TaskImportance
 
 class AddTaskScreen(ModalScreen[MainTask|None]):
+    """Screen with a dialog to add or edit a task."""
+
     BINDINGS = [("escape", "escape", "Close")]
 
     def __init__(self, task: MainTask|None = None, **kwargs):

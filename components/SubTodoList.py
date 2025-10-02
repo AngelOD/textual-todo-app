@@ -14,7 +14,6 @@ class SubTodoList(ListView):
     """
 
     BINDINGS = [
-        ("e", "edit_task", "Edit Subtask"),
         ("c", "complete_task", "Mark Completed"),
         ("n", "renew_task", "Mark New"),
         ("backspace", "delete_task", "Delete Subtask")
@@ -31,6 +30,13 @@ class SubTodoList(ListView):
 
     def on_focus(self):
         self.post_message(SubTodoList.Focused())
+
+    def on_list_view_highlighted(self) -> None:
+        selected_task = self.get_selected_task()
+        if selected_task is None:
+            self.post_message(SubTodoList.TaskSelected(task_id=""))
+
+        self.post_message(SubTodoList.TaskSelected(task_id=id_to_uuid(selected_task.id)))
 
     def action_complete_task(self) -> None:
         self._update_task_state(TaskState.COMPLETED)
@@ -116,6 +122,13 @@ class SubTodoList(ListView):
 
         def __init__(self) -> None:
             super().__init__()
+
+    class TaskSelected(Message):
+        """Message notifying the system that a specific subtask has been selected"""
+
+        def __init__(self, task_id: str) -> None:
+            super().__init__()
+            self.task_id = task_id
 
     class UpdateTaskState(Message):
         """Message sending task update"""
