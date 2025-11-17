@@ -27,6 +27,7 @@ share/python-wheels/
 MANIFEST
 
 todo_list.json
+todo_list.db
 /.idea/
 
 # PyInstaller

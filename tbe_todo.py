@@ -1,24 +1,24 @@
-import uuid
-
 from typing import List
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.reactive import reactive
-from textual.widgets import Footer, Header, Input, Button, Label
+from textual.widgets import Footer, Header, Label
 
 from tbe_todo_utils import load_tasks, save_tasks, sort_subtasks, sort_tasks
 from models import MainTask, Task
-from components import AddSubtaskScreen, AddTaskScreen, DeleteScreen, MainTodoList, SubTodoList
+from components import AddSubtaskScreen, AddTaskScreen, DeleteScreen, MainTodoList, SubTasksScreen, SubTodoList
+from services import db
 
 
 class TodoApp(App):
-    CSS_PATH = 'tbe_todo.tcss'
+    CSS_PATH = "tbe_todo.tcss"
     BINDINGS = [
         ("a", "add_task", "Add Task"),
         ("s", "add_subtask", "Add Subtask"),
         ("e", "edit_task", "Edit (Sub)Task"),
         ("delete", "delete_task", "Delete Task"),
+        ("t", "test", "Test"),
         ("q", "quit", "Quit")
     ]
 
@@ -48,6 +48,10 @@ class TodoApp(App):
     async def watch_tasks(self, updated_tasks: List[MainTask]) -> None:
         await self._get_tasks_list().set_tasks(self.tasks)
         save_tasks(updated_tasks)
+
+    def action_test(self) -> None:
+        self.push_screen(SubTasksScreen())
+        print(db.load_tasks())
 
     def action_add_task(self):
         def handle_add_task(task: MainTask|None) -> None:
